@@ -57,7 +57,7 @@ If you're having trouble building on the host, you can try building in Docker:
 
 ```
 docker build -t ebpf_exporter .
-docker cp $(docker create ebpf_exporter):/ebpf_exporter ./
+docker cp $(docker create ebpf_exporter):/usr/sbin/ebpf_exporter ebpf_exporter
 ```
 
 To build examples (see [building examples section](#building-examples)):
@@ -502,9 +502,10 @@ that kernel operates on into human readable form like `1.1.1.1`.
 
 KSym decoder takes kernel address and converts that to the function name.
 
-In your eBPF program you can use `PT_REGS_IP_CORE(ctx)` to get the address
-of the function you attached to as a `u64` variable. Note that for kprobes
-you need to wrap it with `KPROBE_REGS_IP_FIX()` from `regs-ip.bpf.h`.
+In your eBPF program you can use `PT_REGS_IP(ctx)` to get the address
+of the kprobe you attached to as a `u64` variable. Note that sometimes
+you can observe `PT_REGS_IP` being off by one. You can subtract 1 in your code
+to make it point to the right instruction that can be found `/proc/kallsyms`.
 
 #### `majorminor`
 
@@ -600,10 +601,28 @@ See [Programs](#programs) section for more details.
 name: <program name>
 # Metrics attached to the program
 [ metrics: metrics ]
+# Perf events configuration
+perf_events:
+  [ - perf_event ]
 # Kernel symbol addresses to define as kaddr_{symbol} from /proc/kallsyms (consider CONFIG_KALLSYMS_ALL)
 kaddrs:
   [ - symbol_to_resolve ]
 ```
+
+#### `perf_event`
+
+See [llcstat](examples/llcstat.yaml) as an example.
+
+```
+- type: [ perf event type code ]
+  name: [ perf event name code ]
+  target: [ target eBPF function ]
+  sample_period: [ sample period ]
+  sample_frequency: [ sample frequency ]
+```
+
+It's preferred to use `sample_frequency` to let kernel pick the sample period
+automatically, otherwise you may end up with invalid metrics on overflow.
 
 #### `metrics`
 
@@ -678,17 +697,17 @@ This gauge reports a timeseries for every loaded logical program:
 ebpf_exporter_enabled_programs{name="xfs_reclaim"} 1
 ```
 
-### `ebpf_exporter_ebpf_program_info`
+### `ebpf_exporter_ebpf_programs`
 
 This gauge reports information available for every ebpf program:
 
 ```
 # HELP ebpf_exporter_ebpf_programs Info about ebpf programs
 # TYPE ebpf_exporter_ebpf_programs gauge
-ebpf_exporter_ebpf_program_info{function="add_to_page_cache_lru",id="247",program="cachestat",tag="6c007da3187b5b32"} 1
-ebpf_exporter_ebpf_program_info{function="folio_account_dirtied",id="249",program="cachestat",tag="6c007da3187b5b32"} 1
-ebpf_exporter_ebpf_program_info{function="mark_buffer_dirty",id="250",program="cachestat",tag="6c007da3187b5b32"} 1
-ebpf_exporter_ebpf_program_info{function="mark_page_accessed",id="248",program="cachestat",tag="6c007da3187b5b32"} 1
+ebpf_exporter_ebpf_programs{function="xfs_fs_free_cached_objects_end",program="xfs_reclaim",tag="d5e845dc27b372e4"} 1
+ebpf_exporter_ebpf_programs{function="xfs_fs_free_cached_objects_start",program="xfs_reclaim",tag="c2439d02dd0ba000"} 1
+ebpf_exporter_ebpf_programs{function="xfs_fs_nr_cached_objects_end",program="xfs_reclaim",tag="598375893f34ef39"} 1
+ebpf_exporter_ebpf_programs{function="xfs_fs_nr_cached_objects_start",program="xfs_reclaim",tag="cf30348184f983dd"} 1
 ```
 
 Here `tag` can be used for tracing and performance analysis with two conditions:
@@ -700,58 +719,6 @@ Newer kernels allow `--kallsyms` to `perf top` as well,
 in the future it may not be required at all:
 
 * https://www.spinics.net/lists/linux-perf-users/msg07216.html
-
-### `ebpf_exporter_ebpf_program_attached`
-
-This gauge reports whether individual programs were successfully attached.
-
-```
-# HELP ebpf_exporter_ebpf_program_attached Whether a program is attached
-# TYPE ebpf_exporter_ebpf_program_attached gauge
-ebpf_exporter_ebpf_program_attached{id="247"} 1
-ebpf_exporter_ebpf_program_attached{id="248"} 1
-ebpf_exporter_ebpf_program_attached{id="249"} 0
-ebpf_exporter_ebpf_program_attached{id="250"} 1
-```
-
-It needs to be joined by `id` label with `ebpf_exporter_ebpf_program_info`
-to get more information about the program.
-
-### `ebpf_exporter_ebpf_program_run_time_seconds`
-
-This counter reports how much time individual programs spent running.
-
-```
-# HELP ebpf_exporter_ebpf_program_run_time_seconds How long has the program been executing
-# TYPE ebpf_exporter_ebpf_program_run_time_seconds counter
-ebpf_exporter_ebpf_program_run_time_seconds{id="247"} 0
-ebpf_exporter_ebpf_program_run_time_seconds{id="248"} 0.001252621
-ebpf_exporter_ebpf_program_run_time_seconds{id="249"} 0
-ebpf_exporter_ebpf_program_run_time_seconds{id="250"} 3.6668e-05
-```
-
-It requires `kernel.bpf_stats_enabled` sysctl to be enabled.
-
-It needs to be joined by `id` label with `ebpf_exporter_ebpf_program_info`
-to get more information about the program.
-
-### `ebpf_exporter_ebpf_program_run_count_total`
-
-This counter reports how many times individual programs ran.
-
-```
-# HELP ebpf_exporter_ebpf_program_run_count_total How many times has the program been executed
-# TYPE ebpf_exporter_ebpf_program_run_count_total counter
-ebpf_exporter_ebpf_program_run_count_total{id="247"} 0
-ebpf_exporter_ebpf_program_run_count_total{id="248"} 11336
-ebpf_exporter_ebpf_program_run_count_total{id="249"} 0
-ebpf_exporter_ebpf_program_run_count_total{id="250"} 69
-```
-
-It requires `kernel.bpf_stats_enabled` sysctl to be enabled.
-
-It needs to be joined by `id` label with `ebpf_exporter_ebpf_program_info`
-to get more information about the program.
 
 ## License
 

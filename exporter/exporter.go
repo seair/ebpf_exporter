@@ -15,6 +15,7 @@ import (
 	"github.com/cloudflare/ebpf_exporter/config"
 	"github.com/cloudflare/ebpf_exporter/decoder"
 	"github.com/cloudflare/ebpf_exporter/util"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -29,10 +30,7 @@ type Exporter struct {
 	kaddrs                   map[string]uint64
 	enabledProgramsDesc      *prometheus.Desc
 	programInfoDesc          *prometheus.Desc
-	programAttachedDesc      *prometheus.Desc
-	programRunTimeDesc       *prometheus.Desc
-	programRunCountDesc      *prometheus.Desc
-	attachedProgs            map[string]map[*libbpfgo.BPFProg]bool
+	programTags              map[string]map[string]string
 	descs                    map[string]map[string]*prometheus.Desc
 	decoders                 *decoder.Set
 }
@@ -52,30 +50,9 @@ func New(cfg config.Config) (*Exporter, error) {
 	)
 
 	programInfoDesc := prometheus.NewDesc(
-		prometheus.BuildFQName(prometheusNamespace, "", "ebpf_program_info"),
+		prometheus.BuildFQName(prometheusNamespace, "", "ebpf_programs"),
 		"Info about ebpf programs",
-		[]string{"program", "function", "tag", "id"},
-		nil,
-	)
-
-	programAttachedDesc := prometheus.NewDesc(
-		prometheus.BuildFQName(prometheusNamespace, "", "ebpf_program_attached"),
-		"Whether a program is attached",
-		[]string{"id"},
-		nil,
-	)
-
-	programRunTimeDesc := prometheus.NewDesc(
-		prometheus.BuildFQName(prometheusNamespace, "", "ebpf_program_run_time_seconds"),
-		"How long has the program been executing",
-		[]string{"id"},
-		nil,
-	)
-
-	programRunCountDesc := prometheus.NewDesc(
-		prometheus.BuildFQName(prometheusNamespace, "", "ebpf_program_run_count_total"),
-		"How many times has the program been executed",
-		[]string{"id"},
+		[]string{"program", "function", "tag"},
 		nil,
 	)
 
@@ -85,10 +62,7 @@ func New(cfg config.Config) (*Exporter, error) {
 		kaddrs:              map[string]uint64{},
 		enabledProgramsDesc: enabledProgramsDesc,
 		programInfoDesc:     programInfoDesc,
-		programAttachedDesc: programAttachedDesc,
-		programRunTimeDesc:  programRunTimeDesc,
-		programRunCountDesc: programRunCountDesc,
-		attachedProgs:       map[string]map[*libbpfgo.BPFProg]bool{},
+		programTags:         map[string]map[string]string{},
 		descs:               map[string]map[string]*prometheus.Desc{},
 		decoders:            decoder.NewSet(),
 	}, nil
@@ -96,11 +70,6 @@ func New(cfg config.Config) (*Exporter, error) {
 
 // Attach injects eBPF into kernel and attaches necessary kprobes
 func (e *Exporter) Attach(configPath string) error {
-	err := registerHandlers()
-	if err != nil {
-		return fmt.Errorf("error registering libbpf handlers: %v", err)
-	}
-
 	for _, program := range e.config.Programs {
 		if _, ok := e.modules[program.Name]; ok {
 			return fmt.Errorf("multiple programs with name %q", program.Name)
@@ -124,16 +93,14 @@ func (e *Exporter) Attach(configPath string) error {
 			return fmt.Errorf("error loading bpf object from %q for program %q: %v", bpfProgPath, program.Name, err)
 		}
 
-		attachments, err := attachModule(module, program)
+		tags, err := attachModule(module, program)
 		if err != nil {
 			return fmt.Errorf("failed to attach to program %q: %s", program.Name, err)
 		}
 
-		e.attachedProgs[program.Name] = attachments
+		e.programTags[program.Name] = tags
 		e.modules[program.Name] = module
 	}
-
-	postAttachMark()
 
 	return nil
 }
@@ -205,7 +172,6 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 	ch <- e.enabledProgramsDesc
 	ch <- e.programInfoDesc
-	ch <- e.programAttachedDesc
 
 	for _, program := range e.config.Programs {
 		if _, ok := e.descs[program.Name]; !ok {
@@ -233,33 +199,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(e.enabledProgramsDesc, prometheus.GaugeValue, 1, program.Name)
 	}
 
-	for program, attachments := range e.attachedProgs {
-		for prog, attached := range attachments {
-			info, err := extractProgInfo(prog)
-			if err != nil {
-				log.Printf("Error extracting prog info for %q in %q: %v", prog.Name(), program, err)
-			}
-
-			id := strconv.Itoa(info.id)
-
-			ch <- prometheus.MustNewConstMetric(e.programInfoDesc, prometheus.GaugeValue, 1, program, prog.Name(), info.tag, id)
-
-			attachedValue := 0.0
-			if attached {
-				attachedValue = 1.0
-			}
-
-			ch <- prometheus.MustNewConstMetric(e.programAttachedDesc, prometheus.GaugeValue, attachedValue, id)
-
-			statsEnabled, err := bpfStatsEnabled()
-			if err != nil {
-				log.Printf("Error checking whether bpf stats are enabled: %v", err)
-			} else {
-				if statsEnabled {
-					ch <- prometheus.MustNewConstMetric(e.programRunTimeDesc, prometheus.CounterValue, info.runTime.Seconds(), id)
-					ch <- prometheus.MustNewConstMetric(e.programRunCountDesc, prometheus.CounterValue, float64(info.runCount), id)
-				}
-			}
+	for program, tags := range e.programTags {
+		for function, tag := range tags {
+			ch <- prometheus.MustNewConstMetric(e.programInfoDesc, prometheus.GaugeValue, 1, program, function, tag)
 		}
 	}
 

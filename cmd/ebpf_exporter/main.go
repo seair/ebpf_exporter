@@ -4,15 +4,14 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"time"
 
 	"github.com/cloudflare/ebpf_exporter/config"
 	"github.com/cloudflare/ebpf_exporter/exporter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
-	"gopkg.in/alecthomas/kingpin.v2"
-	"gopkg.in/yaml.v2"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func main() {
@@ -23,8 +22,6 @@ func main() {
 	kingpin.Version(version.Print("ebpf_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
-
-	started := time.Now()
 
 	config := config.Config{}
 
@@ -37,14 +34,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating exporter: %s", err)
 	}
-
 	configPath := filepath.Dir((*configFile).Name())
 	err = e.Attach(configPath)
 	if err != nil {
 		log.Fatalf("Error attaching exporter: %s", err)
 	}
 
-	log.Printf("Started with %d programs found in the config in %dms", len(config.Programs), time.Since(started).Milliseconds())
+	log.Printf("Starting with %d programs found in the config", len(config.Programs))
 
 	err = prometheus.Register(version.NewCollector("ebpf_exporter"))
 	if err != nil {
