@@ -1,16 +1,17 @@
-FROM ubuntu:22.04 as builder
+FROM mirrors.tencent.com/g_k_cdp/tlinux2.6-minimal:latest as builder
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl git ca-certificates build-essential libelf-dev gnupg2
+RUN yum update -y && \
+    yum install -y curl git ca-certificates build-essential libelf-dev gnupg2 golang wget tar gcc automake autoconf libtool make elfutils-libelf-devel
 
-RUN echo 'deb https://ppa.launchpadcontent.net/longsleep/golang-backports/ubuntu jammy main' > /etc/apt/sources.list.d/golang-backports.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52b59b1571a79dbc054901c0f6bc817356a3d45e && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends golang-1.19-go
+RUN echo 'install go' && \
+    wget https://studygolang.com/dl/golang/go1.19.2.linux-amd64.tar.gz && \
+    tar -zvxf go1.19.2.linux-amd64.tar.gz && \
+    mv go /usr/lib/golang && \
+    rm -f go1.19.2.linux-amd64.tar.gz
 
 RUN mkdir /build
 
-RUN git clone --branch v1.0.1 --depth 1 https://github.com/libbpf/libbpf.git /build/libbpf && \
+RUN git clone https://github.com/seair/libbpf.git /build/libbpf && \
     make -C /build/libbpf/src BUILD_STATIC_ONLY=y LIBSUBDIR=lib install
 
 RUN tar -czf /build/libbpf.tar.gz /usr/lib/libbpf.a /usr/lib/pkgconfig/libbpf.pc /usr/include/bpf

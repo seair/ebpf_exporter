@@ -4,7 +4,7 @@ go 1.17
 
 require github.com/aquasecurity/libbpfgo v0.0.0
 
-replace github.com/aquasecurity/libbpfgo => ../libbpfgo
+replace github.com/aquasecurity/libbpfgo => ./libbpfgo
 
 require (
 	github.com/elastic/go-perf v0.0.0-20191212140718-9c656876f595
