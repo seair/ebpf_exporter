@@ -20,8 +20,8 @@ case ${1} in
 		/usr/sbin/init
 		source /etc/profile
 		source ~/.bashrc
+		/ebpf_exporter --config.file=/examples/timers.yaml &
 		tail -f /dev/null
-		/ebpf_exporter --config.file=/build/ebpf_exporter/examples/timers.yaml &
 		;;
 	*)
 		exec "$@"

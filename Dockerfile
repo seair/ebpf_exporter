@@ -35,5 +35,7 @@ RUN cd /build/ebpf_exporter && \
 COPY entrypoint.sh /sbin/
 COPY wait-for-it.sh /sbin/
 
+ENTRYPOINT [ "/sbin/entrypoint.sh", "start" ]
+
 #Expose ports
 EXPOSE 9435
