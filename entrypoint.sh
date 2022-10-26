@@ -20,7 +20,7 @@ case ${1} in
 		/usr/sbin/init
 		source /etc/profile
 		source ~/.bashrc
-		/ebpf_exporter --config.file=/examples/timers.yaml &
+		/ebpf_exporter --config.file=/examples/hgame.yaml &
 		tail -f /dev/null
 		;;
 	*)
