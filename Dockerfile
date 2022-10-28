@@ -1,4 +1,4 @@
-FROM mirrors.tencent.com/tlinux/tlinux2.6:v20220506 as builder
+FROM mirrors.tencent.com/tlinux/tlinux2.6-minimal:v20220329 as builder
 
 MAINTAINER zzhijie
 
@@ -10,7 +10,7 @@ ENV LANG=en_US.UTF-8
 ENV TZ=Asia/Shanghai
 
 RUN yum update -y && \
-    yum install -y curl git ca-certificates build-essential libelf-dev gnupg2 golang wget tar gcc automake autoconf libtool make elfutils-libelf-devel
+    yum install -y curl git ca-certificates build-essential libelf-dev gnupg2 golang wget tar gcc automake autoconf libtool make elfutils-libelf-devel procps
 
 RUN echo 'install go' && \
     wget https://studygolang.com/dl/golang/go1.19.2.linux-amd64.tar.gz && \
