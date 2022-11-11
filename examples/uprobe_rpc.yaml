@@ -1,0 +1,51 @@
+programs:
+  - name: uprobe_rpc
+    metrics:
+      counters:
+        - name: hgame_bigworld_reload_total
+          help: Number of libc malloc calls per cgroup
+          labels:
+            - name: process
+              size: 32
+              decoders:
+                - name: string
+            - name: stack0
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack1
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack2
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack3
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack4
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack5
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack6
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack7
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack8
+              size: 8
+              decoders:
+                - name: ksym
+            - name: stack9
+              size: 8
+              decoders:
+                - name: ksym

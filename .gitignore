@@ -1,3 +1,4 @@
 /ebpf_exporter
 /vendor
 .ccls-cache
+protos
