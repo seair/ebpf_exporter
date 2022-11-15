@@ -1,0 +1,25 @@
+programs:
+  - name: profile
+    metrics:
+      counters:
+        - name: hgame_cpu_sample_count
+          help: sample count of function
+          labels:
+            - name: cgroup
+              size: 8
+              decoders:
+                - name: uint
+                - name: cgroup
+            - name: comm
+              size: 16
+              decoders:
+                - name: string
+            - name: stack
+              size: 8
+              decoders:
+                - name: hex
+    perf_events:
+      - type: 0x0 # HARDWARE
+        name: 0x0 # PERF_COUNT_HW_CPU_CYCLES
+        target: profile
+        sample_frequency: 99
